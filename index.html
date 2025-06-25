@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voice Translator</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#667eea" />
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="app-header">
+        <h1><i class="fas fa-sun"></i> Wedding Translator</h1>
+        <p>Translate between Polish, Hungarian, and English</p>
+      </header>
+
+      <main class="main-content">
+        <div class="language-selector">
+          <div class="language-pair">
+            <div class="language-input">
+              <label for="sourceLanguage">From:</label>
+              <select id="sourceLanguage" class="language-select">
+                <option value="pl">🇵🇱 Polish</option>
+                <option value="hu">🇭🇺 Hungarian</option>
+                <option value="en" selected>🇺🇸 English</option>
+              </select>
+            </div>
+
+            <button class="swap-btn" id="swapLanguages">
+              <i class="fas fa-arrow-right"></i>
+            </button>
+
+            <div class="language-input">
+              <label for="targetLanguage">To:</label>
+              <select id="targetLanguage" class="language-select">
+                <option value="pl">🇵🇱 Polish</option>
+                <option value="hu" selected>🇭🇺 Hungarian</option>
+                <option value="en">🇺🇸 English</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="translation-area">
+          <div class="input-section">
+            <div class="text-input-container">
+              <textarea
+                id="sourceText"
+                placeholder="Type or speak your text here..."
+                rows="4"
+              ></textarea>
+              <button class="clear-btn" id="clearSource">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+
+            <div class="voice-controls">
+              <button class="voice-btn" id="voiceInputBtn">
+                <i class="fas fa-microphone"></i>
+                <span>Hold to Speak & Auto-Translate</span>
+              </button>
+              <div class="recording-indicator" id="recordingIndicator">
+                <div class="pulse"></div>
+                <span>Listening...</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="output-section">
+            <div class="text-output-container">
+              <textarea
+                id="targetText"
+                placeholder="Translation will appear here..."
+                rows="4"
+                readonly
+              ></textarea>
+              <button class="speak-btn" id="speakOutput">
+                <i class="fas fa-volume-up"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="status-message" id="statusMessage"></div>
+      </main>
+
+      <footer class="app-footer">
+        <p>Powered by Google Translate API</p>
+      </footer>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
