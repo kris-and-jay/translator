@@ -53,15 +53,30 @@ class VoiceTranslator {
   }
 
   initializeSpeechRecognition() {
+    // Check for mobile devices
+    const isMobile =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      );
+
     if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
       const SpeechRecognition =
         window.SpeechRecognition || window.webkitSpeechRecognition;
       this.recognition = new SpeechRecognition();
 
-      // Enhanced configuration for better device compatibility
-      this.recognition.continuous = false;
-      this.recognition.interimResults = true;
-      this.recognition.maxAlternatives = 3;
+      // Mobile-optimized configuration
+      if (isMobile) {
+        // Use more conservative settings for mobile
+        this.recognition.continuous = false;
+        this.recognition.interimResults = false; // Disable interim results on mobile for better stability
+        this.recognition.maxAlternatives = 1;
+        this.recognition.grammars = null; // Disable grammars on mobile
+      } else {
+        // Desktop settings
+        this.recognition.continuous = false;
+        this.recognition.interimResults = true;
+        this.recognition.maxAlternatives = 3;
+      }
 
       // Set default language
       this.recognition.lang = "en-US";
@@ -75,7 +90,6 @@ class VoiceTranslator {
       };
 
       this.recognition.onresult = (event) => {
-        let interimTranscript = "";
         let finalTranscript = "";
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -88,15 +102,11 @@ class VoiceTranslator {
 
           if (event.results[i].isFinal) {
             finalTranscript += transcript;
-          } else {
-            interimTranscript += transcript;
+          } else if (!isMobile) {
+            // Only show interim results on desktop
+            this.lastInterimTranscript = transcript;
+            this.sourceText.value = transcript;
           }
-        }
-
-        // Store the last interim transcript
-        if (interimTranscript) {
-          this.lastInterimTranscript = interimTranscript;
-          this.sourceText.value = interimTranscript;
         }
 
         if (finalTranscript) {
@@ -119,10 +129,11 @@ class VoiceTranslator {
         this.stopRecording();
 
         let errorMessage = "Speech recognition error";
+
         switch (event.error) {
           case "not-allowed":
             errorMessage =
-              "Microphone access denied. Please allow microphone permissions.";
+              "Microphone access denied. Please allow microphone permissions in your browser settings.";
             break;
           case "no-speech":
             errorMessage =
@@ -137,7 +148,17 @@ class VoiceTranslator {
               "Network error. Please check your internet connection.";
             break;
           case "service-not-allowed":
-            errorMessage = "Speech recognition service not allowed.";
+            // Try alternative approach for mobile
+            if (isMobile) {
+              this.tryAlternativeSpeechRecognition();
+              return;
+            } else {
+              errorMessage =
+                "Speech recognition service not allowed. Please try a different browser.";
+            }
+            break;
+          case "aborted":
+            errorMessage = "Speech recognition was aborted. Please try again.";
             break;
           default:
             errorMessage = `Speech recognition error: ${event.error}`;
@@ -173,7 +194,35 @@ class VoiceTranslator {
         "error"
       );
       this.voiceInputBtn.disabled = true;
-      this.voiceTranslateBtn.disabled = true;
+      this.voiceInputBtn.style.opacity = "0.5";
+      this.voiceInputBtn.title = "Voice input not available";
+    }
+  }
+
+  // Alternative speech recognition method for mobile
+  tryAlternativeSpeechRecognition() {
+    this.updateStatus(
+      "Trying alternative speech recognition method...",
+      "info"
+    );
+
+    // Try with different configuration
+    if (this.recognition) {
+      try {
+        // Reset and try with minimal configuration
+        this.recognition.continuous = false;
+        this.recognition.interimResults = false;
+        this.recognition.maxAlternatives = 1;
+
+        // Try starting again
+        this.recognition.start();
+      } catch (error) {
+        console.error("Alternative speech recognition failed:", error);
+        this.updateStatus(
+          "Speech recognition not available on this device. Please use text input.",
+          "error"
+        );
+      }
     }
   }
 
@@ -281,10 +330,20 @@ class VoiceTranslator {
       console.log(`Starting speech recognition with language: ${sourceLang}`);
     } catch (error) {
       console.error("Error starting speech recognition:", error);
-      this.updateStatus(
-        "Error starting speech recognition. Please try again.",
-        "error"
-      );
+
+      // Try alternative approach for mobile
+      const isMobile =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        );
+      if (isMobile) {
+        this.tryAlternativeSpeechRecognition();
+      } else {
+        this.updateStatus(
+          "Error starting speech recognition. Please try again.",
+          "error"
+        );
+      }
     }
   }
 
