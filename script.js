@@ -65,9 +65,11 @@ class VoiceTranslator {
       // Mobile-optimized configuration
       if (this.isMobile) {
         this.recognition.continuous = false;
-        this.recognition.interimResults = false;
-        this.recognition.maxAlternatives = 1;
-        this.recognition.grammars = null;
+        //this.recognition.interimResults = false;
+        this.recognition.interimResults = true;
+        //this.recognition.maxAlternatives = 1;
+        this.recognition.maxAlternatives = 3;
+        //this.recognition.grammars = null;
       } else {
         this.recognition.continuous = false;
         this.recognition.interimResults = true;
