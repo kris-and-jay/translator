@@ -17,7 +17,13 @@ class VoiceTranslator {
     this.initializeSpeechRecognition();
     this.bindEvents();
     this.preloadVoices();
-    this.updateStatus("Ready to translate", "info");
+
+    // Mobile-specific initial message
+    if (this.isMobile) {
+      this.updateStatus("Tap the microphone to start translating", "info");
+    } else {
+      this.updateStatus("Ready to translate", "info");
+    }
   }
 
   initializeElements() {
@@ -65,11 +71,10 @@ class VoiceTranslator {
       // Mobile-optimized configuration
       if (this.isMobile) {
         this.recognition.continuous = false;
-        //this.recognition.interimResults = false;
         this.recognition.interimResults = true;
-        //this.recognition.maxAlternatives = 1;
         this.recognition.maxAlternatives = 3;
-        //this.recognition.grammars = null;
+        // Shorter timeout for mobile to make it more responsive
+        this.recognition.maxAlternatives = 1;
       } else {
         this.recognition.continuous = false;
         this.recognition.interimResults = true;
@@ -87,6 +92,7 @@ class VoiceTranslator {
 
       this.recognition.onresult = (event) => {
         let finalTranscript = "";
+        let interimTranscript = "";
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
@@ -94,10 +100,15 @@ class VoiceTranslator {
 
           if (event.results[i].isFinal) {
             finalTranscript += transcript;
-          } else if (!this.isMobile) {
-            this.lastInterimTranscript = transcript;
-            this.sourceText.value = transcript;
+          } else {
+            interimTranscript += transcript;
           }
+        }
+
+        // Show interim results on mobile for better feedback
+        if (interimTranscript && this.isMobile) {
+          this.sourceText.value = interimTranscript;
+          this.lastInterimTranscript = interimTranscript;
         }
 
         if (finalTranscript) {
@@ -105,11 +116,18 @@ class VoiceTranslator {
           this.lastInterimTranscript = finalTranscript;
           this.updateStatus("Speech captured successfully", "success");
 
-          // Ensure translation happens on mobile
-          setTimeout(() => {
-            this.updateStatus("Translating...", "info");
-            this.translateAndSpeak();
-          }, 300);
+          // Auto-translate and speak on mobile
+          if (this.isMobile) {
+            setTimeout(() => {
+              this.updateStatus("Translating...", "info");
+              this.translateAndSpeak();
+            }, 200); // Reduced delay for mobile
+          } else {
+            setTimeout(() => {
+              this.updateStatus("Translating...", "info");
+              this.translateAndSpeak();
+            }, 300);
+          }
         }
       };
 
@@ -160,11 +178,21 @@ class VoiceTranslator {
           this.sourceText.value = this.lastInterimTranscript;
           this.updateStatus("Speech captured successfully", "success");
 
-          // Ensure translation happens on mobile
-          setTimeout(() => {
-            this.updateStatus("Translating...", "info");
-            this.translateAndSpeak();
-          }, 300);
+          // Auto-translate and speak on mobile
+          if (this.isMobile) {
+            setTimeout(() => {
+              this.updateStatus("Translating...", "info");
+              this.translateAndSpeak();
+            }, 200); // Reduced delay for mobile
+          } else {
+            setTimeout(() => {
+              this.updateStatus("Translating...", "info");
+              this.translateAndSpeak();
+            }, 300);
+          }
+        } else if (this.isMobile) {
+          // No speech detected on mobile
+          this.updateStatus("No speech detected. Tap again to try.", "info");
         }
 
         this.stopRecording();
@@ -207,47 +235,63 @@ class VoiceTranslator {
     // Voice input button events with improved touch handling
     this.voiceInputBtn.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      this.startRecording();
+      if (!this.isMobile) {
+        this.startRecording();
+      }
     });
     this.voiceInputBtn.addEventListener("mouseup", (e) => {
       e.preventDefault();
-      this.stopRecording();
+      if (!this.isMobile) {
+        this.stopRecording();
+      }
     });
     this.voiceInputBtn.addEventListener("mouseleave", (e) => {
       e.preventDefault();
-      this.stopRecording();
+      if (!this.isMobile) {
+        this.stopRecording();
+      }
     });
 
-    // Enhanced touch events for mobile
+    // Enhanced touch events for mobile - single tap to start/stop
     this.voiceInputBtn.addEventListener(
       "touchstart",
       (e) => {
         e.preventDefault();
         e.stopPropagation();
-        this.startRecording();
+
+        if (this.isMobile) {
+          if (!this.isRecording) {
+            this.startRecording();
+          } else {
+            this.stopRecording();
+          }
+        }
       },
       { passive: false }
     );
 
-    this.voiceInputBtn.addEventListener(
-      "touchend",
-      (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.stopRecording();
-      },
-      { passive: false }
-    );
+    // Remove touchend and touchcancel handlers for mobile to use single tap
+    if (!this.isMobile) {
+      this.voiceInputBtn.addEventListener(
+        "touchend",
+        (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.stopRecording();
+        },
+        { passive: false }
+      );
 
-    this.voiceInputBtn.addEventListener(
-      "touchcancel",
-      (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.stopRecording();
-      },
-      { passive: false }
-    );
+      this.voiceInputBtn.addEventListener(
+        "touchcancel",
+        (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.stopRecording();
+        },
+        { passive: false }
+      );
+    }
 
     // Other button events
     this.speakOutput.addEventListener("click", () => this.speakTranslation());
@@ -300,6 +344,16 @@ class VoiceTranslator {
 
     try {
       this.recognition.start();
+
+      // Auto-stop recording after 10 seconds on mobile to prevent long holds
+      if (this.isMobile) {
+        this.recordingTimeout = setTimeout(() => {
+          if (this.isRecording) {
+            this.stopRecording();
+            this.updateStatus("Recording stopped automatically", "info");
+          }
+        }, 10000);
+      }
     } catch (error) {
       if (this.isMobile) {
         this.tryAlternativeSpeechRecognition();
@@ -315,6 +369,12 @@ class VoiceTranslator {
   stopRecording() {
     if (!this.recognition || !this.isRecording) {
       return;
+    }
+
+    // Clear the mobile timeout
+    if (this.recordingTimeout) {
+      clearTimeout(this.recordingTimeout);
+      this.recordingTimeout = null;
     }
 
     try {
@@ -446,8 +506,8 @@ class VoiceTranslator {
     }
 
     // Optimized speech settings for mobile
-    utterance.rate = this.isMobile ? 0.9 : 0.85;
-    utterance.pitch = 1.0;
+    utterance.rate = this.isMobile ? 0.85 : 0.85; // Slightly slower on mobile for clarity
+    utterance.pitch = this.isMobile ? 1.1 : 1.0; // Slightly higher pitch on mobile for better clarity
     utterance.volume = 1.0;
 
     // Simplified text enhancement for mobile
@@ -462,6 +522,13 @@ class VoiceTranslator {
 
     utterance.onend = () => {
       this.updateStatus("Translation spoken", "success");
+
+      // On mobile, show a clear message that user can record again
+      if (this.isMobile) {
+        setTimeout(() => {
+          this.updateStatus("Tap the microphone to translate again", "info");
+        }, 2000);
+      }
     };
 
     utterance.onerror = (event) => {
@@ -523,10 +590,12 @@ class VoiceTranslator {
     this.translate()
       .then(() => {
         this.updateStatus("Translation completed, speaking now...", "info");
+        // Faster speech on mobile for better user experience
+        const delay = this.isMobile ? 300 : 500;
         setTimeout(() => {
           this.speakTranslation();
           this.lastInterimTranscript = "";
-        }, 500);
+        }, delay);
       })
       .catch(() => {
         this.updateStatus("Translation failed, cannot speak result", "error");
