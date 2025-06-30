@@ -764,8 +764,13 @@ if (window.speechSynthesis) {
 // Service Worker for PWA capabilities
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
+    // Register service worker for the current path
+    const swPath = window.location.pathname.includes("/translator/")
+      ? "/translator/sw.js"
+      : "/sw.js";
+
     navigator.serviceWorker
-      .register("/sw.js")
+      .register(swPath)
       .then((registration) => {
         // Service worker registered successfully
       })

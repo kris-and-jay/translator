@@ -2,7 +2,7 @@
   "name": "Wedding Translator",
   "short_name": "Wedding Translator",
   "description": "A mobile-first voice translation app for weddings, supporting Polish, Hungarian, and English",
-  "start_url": "/",
+  "start_url": "/translator/",
   "display": "standalone",
   "background_color": "#3498db",
   "theme_color": "#3498db",
