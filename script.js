@@ -11,6 +11,8 @@ class VoiceTranslator {
       /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
         navigator.userAgent
       );
+    this.firstRecordingAttempt = true;
+    this.retryCount = 0;
 
     this.initializeElements();
     this.checkPermissions();
@@ -55,10 +57,41 @@ class VoiceTranslator {
               : "Microphone permission required",
             this.permissionGranted ? "success" : "error"
           );
+
+          // Pre-initialize speech recognition on mobile after permission is granted
+          if (this.permissionGranted && this.isMobile) {
+            setTimeout(() => {
+              this.preInitializeSpeechRecognition();
+            }, 1000);
+          }
         };
       }
     } catch (error) {
       // Permission API not supported, will request on use
+    }
+  }
+
+  preInitializeSpeechRecognition() {
+    if (this.recognition && this.isMobile) {
+      try {
+        // Pre-warm the recognition engine
+        this.recognition.continuous = false;
+        this.recognition.interimResults = false;
+        this.recognition.maxAlternatives = 1;
+        this.recognition.lang = this.getLanguageCode(this.sourceLanguage.value);
+
+        // This helps initialize the speech recognition engine
+        this.recognition.start();
+        setTimeout(() => {
+          try {
+            this.recognition.stop();
+          } catch (e) {
+            // Ignore stop errors during pre-initialization
+          }
+        }, 100);
+      } catch (error) {
+        // Ignore pre-initialization errors
+      }
     }
   }
 
@@ -114,6 +147,13 @@ class VoiceTranslator {
         if (finalTranscript) {
           this.sourceText.value = finalTranscript;
           this.lastInterimTranscript = finalTranscript;
+
+          // Reset first recording attempt flags on success
+          if (this.isMobile && this.firstRecordingAttempt) {
+            this.firstRecordingAttempt = false;
+            this.retryCount = 0;
+          }
+
           this.updateStatus("Speech captured successfully", "success");
 
           // Auto-translate and speak on mobile
@@ -169,6 +209,20 @@ class VoiceTranslator {
             errorMessage = `Speech recognition error: ${event.error}`;
         }
 
+        // On mobile, retry the first recording attempt if it fails
+        if (
+          this.isMobile &&
+          this.firstRecordingAttempt &&
+          this.retryCount < 2
+        ) {
+          this.retryCount++;
+          this.updateStatus(`Retrying... (${this.retryCount}/2)`, "info");
+          setTimeout(() => {
+            this.startRecording();
+          }, 1000);
+          return;
+        }
+
         this.updateStatus(errorMessage, "error");
       };
 
@@ -176,6 +230,13 @@ class VoiceTranslator {
         // If we have interim results but no final results, treat them as final
         if (this.lastInterimTranscript && this.lastInterimTranscript.trim()) {
           this.sourceText.value = this.lastInterimTranscript;
+
+          // Reset first recording attempt flags on success
+          if (this.isMobile && this.firstRecordingAttempt) {
+            this.firstRecordingAttempt = false;
+            this.retryCount = 0;
+          }
+
           this.updateStatus("Speech captured successfully", "success");
 
           // Auto-translate and speak on mobile
@@ -218,10 +279,22 @@ class VoiceTranslator {
 
     if (this.recognition) {
       try {
+        // Reset recognition settings for mobile compatibility
         this.recognition.continuous = false;
         this.recognition.interimResults = false;
         this.recognition.maxAlternatives = 1;
-        this.recognition.start();
+
+        // Add a small delay to ensure proper initialization
+        setTimeout(() => {
+          try {
+            this.recognition.start();
+          } catch (innerError) {
+            this.updateStatus(
+              "Speech recognition not available on this device. Please use text input.",
+              "error"
+            );
+          }
+        }, 200);
       } catch (error) {
         this.updateStatus(
           "Speech recognition not available on this device. Please use text input.",
@@ -322,14 +395,40 @@ class VoiceTranslator {
 
     this.lastInterimTranscript = "";
 
+    // Reset retry count for new manual recordings (after first successful one)
+    if (this.isMobile && !this.firstRecordingAttempt) {
+      this.retryCount = 0;
+    }
+
+    // Handle microphone permissions with better mobile support
     if (!this.permissionGranted) {
       try {
+        this.updateStatus("Requesting microphone permission...", "info");
+
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
         });
-        stream.getTracks().forEach((track) => track.stop());
-        this.permissionGranted = true;
-        this.updateStatus("Microphone permission granted", "success");
+
+        // Pre-warm the microphone on mobile to avoid first-recording issues
+        if (this.isMobile) {
+          this.updateStatus("Setting up microphone...", "info");
+
+          // Keep the stream active briefly to ensure it's properly initialized
+          setTimeout(() => {
+            stream.getTracks().forEach((track) => track.stop());
+            this.permissionGranted = true;
+            this.updateStatus(
+              "Microphone ready! Tap to start recording.",
+              "success"
+            );
+          }, 500);
+
+          return; // Exit early, user needs to tap again
+        } else {
+          stream.getTracks().forEach((track) => track.stop());
+          this.permissionGranted = true;
+          this.updateStatus("Microphone permission granted", "success");
+        }
       } catch (error) {
         this.updateStatus(
           "Microphone permission required. Please allow microphone access and try again.",
@@ -356,7 +455,11 @@ class VoiceTranslator {
       }
     } catch (error) {
       if (this.isMobile) {
-        this.tryAlternativeSpeechRecognition();
+        // On mobile, try alternative method if first attempt fails
+        this.updateStatus("Retrying speech recognition...", "info");
+        setTimeout(() => {
+          this.tryAlternativeSpeechRecognition();
+        }, 300);
       } else {
         this.updateStatus(
           "Error starting speech recognition. Please try again.",
